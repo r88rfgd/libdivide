@@ -420,17 +420,17 @@ static LIBDIVIDE_INLINE uint64_t libdivide_mullhi_u64(uint64_t x, uint64_t y) {
     return (uint64_t)(rl >> 64);
 #else
     // full 128 bits are x0 * y0 + (x0 * y1 << 32) + (x1 * y0 << 32) + (x1 * y1 << 64)
-    uint32_t mask = 0xFFFFFFFF;
-    uint32_t x0 = (uint32_t)(x & mask);
+    // Use compile-time constant 0xFFFFFFFF instead of runtime variable
+    uint32_t x0 = (uint32_t)(x & 0xFFFFFFFFu);
     uint32_t x1 = (uint32_t)(x >> 32);
-    uint32_t y0 = (uint32_t)(y & mask);
+    uint32_t y0 = (uint32_t)(y & 0xFFFFFFFFu);
     uint32_t y1 = (uint32_t)(y >> 32);
     uint32_t x0y0_hi = libdivide_mullhi_u32(x0, y0);
     uint64_t x0y1 = x0 * (uint64_t)y1;
     uint64_t x1y0 = x1 * (uint64_t)y0;
     uint64_t x1y1 = x1 * (uint64_t)y1;
     uint64_t temp = x1y0 + x0y0_hi;
-    uint64_t temp_lo = temp & mask;
+    uint64_t temp_lo = temp & 0xFFFFFFFFu;
     uint64_t temp_hi = temp >> 32;
 
     return x1y1 + temp_hi + ((temp_lo + x0y1) >> 32);
@@ -1230,8 +1230,9 @@ static LIBDIVIDE_INLINE uint64_t libdivide_u64_recover(const struct libdivide_u6
         // cannot overflow
         uint64_t dr_lo = r_lo + r_lo;
         uint64_t dr_hi = r_hi + r_hi + (dr_lo < r_lo);  // last term is carry
-        int dr_exceeds_d = (dr_hi > d_hi) || (dr_hi == d_hi && dr_lo >= d_lo);
-        uint64_t full_q = half_q + half_q + (dr_exceeds_d ? 1 : 0);
+        // Use bitwise AND/OR to avoid branch: more efficient for division recovery path
+        uint64_t dr_exceeds_d = ((dr_hi > d_hi) | ((dr_hi == d_hi) & (dr_lo >= d_lo)));
+        uint64_t full_q = half_q + half_q + dr_exceeds_d;
         return full_q + 1;
     }
 }
@@ -1265,8 +1266,9 @@ static LIBDIVIDE_INLINE uint64_t libdivide_u64_branchfree_recover(const struct l
         // cannot overflow
         uint64_t dr_lo = r_lo + r_lo;
         uint64_t dr_hi = r_hi + r_hi + (dr_lo < r_lo);  // last term is carry
-        int dr_exceeds_d = (dr_hi > d_hi) || (dr_hi == d_hi && dr_lo >= d_lo);
-        uint64_t full_q = half_q + half_q + (dr_exceeds_d ? 1 : 0);
+        // Use bitwise AND/OR to avoid branch: more efficient for division recovery path
+        uint64_t dr_exceeds_d = ((dr_hi > d_hi) | ((dr_hi == d_hi) & (dr_lo >= d_lo)));
+        uint64_t full_q = half_q + half_q + dr_exceeds_d;
         return full_q + 1;
     }
 }
